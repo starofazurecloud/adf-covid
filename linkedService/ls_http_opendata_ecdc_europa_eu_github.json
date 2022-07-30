@@ -1,0 +1,19 @@
+{
+	"name": "ls_http_opendata_ecdc_europa_eu_github",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"description": "The original data is taken from ecdc website and stored in github . so we will be using github our http repository.",
+		"parameters": {
+			"parSourceBaseURL": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "HttpServer",
+		"typeProperties": {
+			"url": "@{linkedService().parSourceBaseURL}",
+			"enableServerCertificateValidation": true,
+			"authenticationType": "Anonymous"
+		}
+	}
+}

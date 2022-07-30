@@ -1,0 +1,236 @@
+{
+	"name": "df_transform_hospital_admission",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "ds_raw_hospital_admissions",
+						"type": "DatasetReference"
+					},
+					"name": "HospitalAdmissionsSource"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_country_lookup",
+						"type": "DatasetReference"
+					},
+					"name": "CountrySource"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_Dim_Date_Lookup",
+						"type": "DatasetReference"
+					},
+					"name": "DimDateSource"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "ds_Processed_Hospital_Admission_Weekly",
+						"type": "DatasetReference"
+					},
+					"name": "WeeklySink"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_Processed_Hospital_Admission_Daily",
+						"type": "DatasetReference"
+					},
+					"name": "DailySink"
+				}
+			],
+			"transformations": [
+				{
+					"name": "KeepRequiredColumns"
+				},
+				{
+					"name": "lookupCountry"
+				},
+				{
+					"name": "selectRequiredFields"
+				},
+				{
+					"name": "splitDailyandWeekly"
+				},
+				{
+					"name": "DerivedECDCYearWeek"
+				},
+				{
+					"name": "AggDimDate"
+				},
+				{
+					"name": "JoinWithDate"
+				},
+				{
+					"name": "PivotDaily"
+				},
+				{
+					"name": "PivotWeekly"
+				},
+				{
+					"name": "SortbyYearWeek"
+				},
+				{
+					"name": "SortDaily"
+				},
+				{
+					"name": "SelectDaily"
+				},
+				{
+					"name": "SelectWeekly"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          country as string,",
+				"          indicator as string,",
+				"          date as date,",
+				"          year_week as string,",
+				"          value as double,",
+				"          source as string,",
+				"          url as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> HospitalAdmissionsSource",
+				"source(output(",
+				"          country as string,",
+				"          country_code_2_digit as string,",
+				"          country_code_3_digit as string,",
+				"          continent as string,",
+				"          population as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> CountrySource",
+				"source(output(",
+				"          date_key as string,",
+				"          date as string,",
+				"          year as string,",
+				"          month as string,",
+				"          day as string,",
+				"          day_name as string,",
+				"          day_of_year as string,",
+				"          week_of_month as string,",
+				"          week_of_year as string,",
+				"          month_name as string,",
+				"          year_month as string,",
+				"          year_week as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> DimDateSource",
+				"HospitalAdmissionsSource select(mapColumn(",
+				"          country,",
+				"          indicator,",
+				"          value,",
+				"          source,",
+				"          each(match(name==\"date\"||name==\"year_week\"),",
+				"               \"reported_\"+$0 = $$)",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> KeepRequiredColumns",
+				"KeepRequiredColumns, CountrySource lookup(KeepRequiredColumns@country == CountrySource@country,",
+				"     multiple: false,",
+				"     pickup: 'any',",
+				"     broadcast: 'auto')~> lookupCountry",
+				"lookupCountry select(mapColumn(",
+				"          country = KeepRequiredColumns@country,",
+				"          indicator,",
+				"          value,",
+				"          source,",
+				"          reported_date,",
+				"          reported_year_week,",
+				"          country = CountrySource@country,",
+				"          country_code_2_digit,",
+				"          country_code_3_digit,",
+				"          population",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> selectRequiredFields",
+				"selectRequiredFields split(upper(left(indicator, 5))==\"DAILY\",",
+				"     disjoint: false) ~> splitDailyandWeekly@(Daily, Weekly)",
+				"DimDateSource derive(ecdc_year_week = year+\"-W\"+ lpad(week_of_year, 2, '0')) ~> DerivedECDCYearWeek",
+				"DerivedECDCYearWeek aggregate(groupBy(ecdc_year_week),",
+				"     Week_Start_Date = min(date),",
+				"          Week_End_Date = max(date)) ~> AggDimDate",
+				"splitDailyandWeekly@Weekly, AggDimDate join(reported_year_week == ecdc_year_week,",
+				"     joinType:'inner',",
+				"     matchType:'exact',",
+				"     ignoreSpaces: false,",
+				"     broadcast: 'auto')~> JoinWithDate",
+				"splitDailyandWeekly@Daily pivot(groupBy(country,",
+				"          country_code_2_digit,",
+				"          country_code_3_digit,",
+				"          population,",
+				"          reported_date,",
+				"          source),",
+				"     pivotBy(indicator, ['Daily hospital occupancy', 'Daily ICU occupancy']),",
+				"     count = sum(value),",
+				"     columnNaming: '$V_$N',",
+				"     lateral: true) ~> PivotDaily",
+				"JoinWithDate pivot(groupBy(country,",
+				"          country_code_2_digit,",
+				"          country_code_3_digit,",
+				"          population,",
+				"          reported_year_week,",
+				"          Week_Start_Date,",
+				"          Week_End_Date,",
+				"          source),",
+				"     pivotBy(indicator, ['Weekly new hospital admissions per 100k', 'Weekly new ICU admissions per 100k']),",
+				"     count = sum(value),",
+				"     columnNaming: '$V_$N',",
+				"     lateral: true) ~> PivotWeekly",
+				"PivotWeekly sort(desc(reported_year_week, true),",
+				"     asc(country, true)) ~> SortbyYearWeek",
+				"PivotDaily sort(desc(reported_date, true),",
+				"     asc(country, true)) ~> SortDaily",
+				"SortDaily select(mapColumn(",
+				"          country,",
+				"          country_code_2_digit,",
+				"          country_code_3_digit,",
+				"          population,",
+				"          reported_date,",
+				"          source,",
+				"          Daily_Hospital_Occupancy_Count = {Daily hospital occupancy_count},",
+				"          Daily_ICU_Occupancy_Count = {Daily ICU occupancy_count}",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> SelectDaily",
+				"SortbyYearWeek select(mapColumn(",
+				"          country,",
+				"          country_code_2_digit,",
+				"          country_code_3_digit,",
+				"          population,",
+				"          reported_year_week,",
+				"          Week_Start_Date,",
+				"          Week_End_Date,",
+				"          source,",
+				"          Weekly_Hospital_Admission_Count = {Weekly new hospital admissions per 100k_count},",
+				"          Weekly_ICU_Admission_Count = {Weekly new ICU admissions per 100k_count}",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> SelectWeekly",
+				"SelectWeekly sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     truncate: true,",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> WeeklySink",
+				"SelectDaily sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     truncate: true,",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> DailySink"
+			]
+		}
+	}
+}

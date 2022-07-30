@@ -1,0 +1,31 @@
+{
+	"name": "ds_cases_deaths_raw_csv_http",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_http_opendata_ecdc_europa_eu_github",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"parSourceRelativeURL": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "HttpServerLocation",
+				"relativeUrl": {
+					"value": "@dataset().parSourceRelativeURL",
+					"type": "Expression"
+				}
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
