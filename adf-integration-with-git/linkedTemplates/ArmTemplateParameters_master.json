@@ -1,0 +1,30 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "adf-integration-with-git"
+		},
+		"ls_ablob_covidreportingsa_connectionString": {
+			"value": ""
+		},
+		"ls_adls_covidreportingdl_accountKey": {
+			"value": ""
+		},
+		"ls_adls_covidreportingdl_properties_typeProperties_url": {
+			"value": "https://covidreportingdlmzs.dfs.core.windows.net/"
+		},
+		"ls_http_opendata_ecdc_europa_eu_github_properties_typeProperties_url": {
+			"value": "@{linkedService().parSourceBaseURL}"
+		},
+		"tr_ingest_population_data_properties_typeProperties_scope": {
+			"value": "/subscriptions/1101ab50-b9a6-4719-afe5-7586e598ea9f/resourceGroups/covid-reporting-rg/providers/Microsoft.Storage/storageAccounts/covidreportingsamzs"
+		},
+		"containerUri": {
+			"value": ""
+		},
+		"containerSasToken": {
+			"value": ""
+		}
+	}
+}
